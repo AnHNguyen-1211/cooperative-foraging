@@ -1,0 +1,13 @@
+{
+  "name": "scudem-foraging-lab",
+  "version": "3.0.0",
+  "private": true,
+  "description": "SCUDEM Models I and II and paired foraging experiments",
+  "scripts": {
+    "test": "node tests/test_engine.cjs && node tests/test_apply_settings.cjs && node tests/test_server.cjs",
+    "start": "node scripts/serve.cjs",
+    "case-study": "node scripts/run_experiment.cjs case-study",
+    "calibrate": "node scripts/run_experiment.cjs calibrate",
+    "optimum": "node scripts/run_experiment.cjs optimum"
+  }
+}

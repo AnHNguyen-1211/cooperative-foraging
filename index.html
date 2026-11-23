@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f5f4ef">
+  <meta name="description" content="Explore SCUDEM Models I and II for cooperative foraging.">
+  <title>SCUDEM · Foraging Lab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./" aria-label="SCUDEM Foraging Lab">SCUDEM<small>FORAGING<br>LABORATORY</small></a>
+</header>
+<div class="layout">
+  <aside>
+    <form id="settings">
+      <div class="aside-title"><span class="eyebrow">Simulation settings</span></div>
+      <div class="control">
+        <label for="scenario">Observation scenario</label>
+        <select id="scenario">
+          <option value="search">Sparse environment · Section 7</option>
+          <option value="encounter">Start near a patch</option>
+          <option value="hidden">Start near separate patches</option>
+        </select>
+        <p class="help" id="scenarioNote">Food locations and starting positions are seeded.</p>
+      </div>
+      <div class="row">
+        <div class="control"><label for="L">Detection L (m)</label><input id="L" type="number" min="0.01" step="any" value="5" required></div>
+        <div class="control"><label for="R">Communication R (m)</label><input id="R" type="number" min="0.01" max="499" step="any" value="20" required></div>
+      </div>
+      <div class="control"><label for="d">Search separation d <output id="dout">20 m</output></label><input id="d" type="range" min="0" max="20" value="20" step="any"></div>
+      <div class="row">
+        <div class="control"><label for="v">Speed v (m/min)</label><input id="v" type="number" min="0.01" step="any" value="25" required></div>
+        <div class="control"><label for="q">Intake q (g/min)</label><input id="q" type="number" min="0.01" step="any" value="3.4" required></div>
+      </div>
+      <div class="row">
+        <div class="control"><label for="T">Horizon T (min)</label><input id="T" type="number" min="0.01" step="any" value="240" required></div>
+        <div class="control"><label for="N">Food patches N</label><input id="N" type="number" min="1" max="10000" value="20" required></div>
+      </div>
+      <div class="control">
+        <label for="p">Truthfulness p <output id="pout">0.50</output></label>
+        <input id="p" type="range" min="0" max="1" step="0.05" value="0.5">
+        <p class="help">Applies to Random honesty. False negatives occur with probability 1 − p. Truthful messages are split equally between C = 1 and C = 2.</p>
+      </div>
+      <details>
+        <summary>Lognormal mass and numerical settings</summary>
+        <div class="row">
+          <div class="control"><label for="foodMu">Log-mass mean μ</label><input id="foodMu" type="number" step="any" value="5.703782474656201" required></div>
+          <div class="control"><label for="foodSigma">Log-mass SD σ</label><input id="foodSigma" type="number" min="0" step="any" value="0.7" required></div>
+        </div>
+        <div class="row">
+          <div class="control"><label for="dt">Max step (min)</label><input id="dt" type="number" min="0.001" step="any" value="0.1" required></div>
+          <div class="control"><label for="seed">Random seed</label><input id="seed" type="number" step="1" value="42" required></div>
+        </div>
+        <div class="row">
+          <div class="control"><label for="turnTime">Turn interval (min)</label><input id="turnTime" type="number" min="0.001" step="any" value="0.5" required></div>
+          <div class="control"><label for="turnSD">Turn SD (rad)</label><input id="turnSD" type="number" min="0" step="any" value="0.6" required></div>
+        </div>
+      </details>
+      <button id="apply" type="submit" class="button-primary full">Apply &amp; calculate trajectories</button>
+      <p id="applyStatus" class="apply-status feedback" role="status"></p>
+    </form>
+  </aside>
+
+  <main class="main">
+    <section class="intro">
+      <div><div class="eyebrow">Distance · Information · Truthfulness</div><h1>From assumptions to results</h1>
+      <p>Compare foraging trajectories, solve for an optimal search separation and test it in a food-scarce environment.</p></div>
+    </section>
+    <nav class="tabbar" aria-label="Research sections">
+      <button class="tab active" data-tab="trajectory" aria-pressed="true">Trajectories</button>
+      <button class="tab" data-tab="distance" aria-pressed="false">Distance</button>
+      <button class="tab" data-tab="experiments" aria-pressed="false">Experiments</button>
+    </nav>
+    <p id="error" class="alert" role="alert" hidden></p>
+
+    <section id="trajectoryView">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button id="play" class="button-primary" type="button">▶ Play</button>
+          <button id="restart" type="button">Reset time</button>
+          <button id="jump" type="button">First discovery</button>
+          <label class="mini">Playback <select id="speed"><option value="2">2 min/s</option><option value="10" selected>10 min/s</option><option value="30">30 min/s</option></select></label>
+        </div>
+        <span class="timebox" id="clock">0.0 min</span>
+      </div>
+      <div class="compare" id="compare"></div>
+      <template id="card">
+        <article class="simcard">
+          <header class="cardhead">
+            <label class="eyebrow panel-label">Run <span></span><select class="strategy"></select></label>
+          </header>
+          <canvas class="world" role="img"></canvas>
+          <div class="stats">
+            <div class="stat"><div class="name">Food (g)</div><span class="value food">—</span></div>
+            <div class="stat"><div class="name">Gap (m)</div><span class="value gap">—</span></div>
+            <div class="stat"><div class="name">Truthful</div><span class="value truth">—</span></div>
+            <div class="stat"><div class="name">False negatives</div><span class="value lies">—</span></div>
+          </div>
+        </article>
+      </template>
+      <div class="timeline">
+        <span>0 min</span><input id="timeline" type="range" min="0" max="240" value="0" step="any" aria-label="Simulation time">
+        <span id="endTime">240 min</span><label class="check"><input id="showR" type="checkbox"> Show R</label>
+      </div>
+      <div class="insight"><span class="icon" aria-hidden="true">↗</span><span id="insight">Select communication rules and apply to compare both runs.</span></div>
+      <div class="bottomgrid">
+        <section class="panel">
+          <div class="paneltitle"><h3>Cumulative food (g)</h3><small>Run A · teal / Run B · violet</small></div>
+          <canvas class="chart" id="foodChart" role="img" aria-label="Cumulative food consumption by simulation time in minutes"></canvas>
+        </section>
+        <section class="panel">
+          <div class="paneltitle"><h3>Event log</h3><small id="eventCount">0 events</small></div>
+          <ol class="eventlist" id="eventLog"></ol>
+        </section>
+      </div>
+      <div class="option-actions">
+        <button id="downloadReplay" type="button">Export trajectory JSON</button>
+        <button id="runConvergence" type="button">Check step sensitivity</button>
+      </div>
+      <p class="mini" id="diagnostics"></p>
+      <p class="mini" id="convergenceResults" role="status"></p>
+    </section>
+
+    <section id="distanceView" hidden>
+      <div class="batchintro"><div><div class="eyebrow">Model II · Sections 5 and 7.3</div>
+      <h2>Optimal search separation</h2><p>Find the global minimum expected time to discover food and approach it together.</p></div></div>
+      <div class="formula">H(d) = 1 / [k(A(d) + B(d))] + (L + αd) / v</div>
+      <p class="mini">A(d) is the area covered by two detection disks. B(d) is zero through 2L and equals β[1 − exp(−γ(d − 2L))] beyond 2L.</p>
+      <div class="experiment-options">
+        <div class="control"><label for="fitMode">Parameter source</label><select id="fitMode"><option value="report">Report parameters · Section 7.3</option><option value="custom">Custom parameters</option><option value="simulation">Calibrate from simulated first hits</option></select></div>
+        <div class="control" id="calibrationOptions" hidden><label for="calK">Trials per batch</label><input id="calK" type="number" min="1" max="3000" step="1" value="300"></div>
+      </div>
+      <fieldset id="fitFields" class="experiment-options" hidden>
+        <div class="control"><label for="k">k (m⁻² min⁻¹)</label><input id="k" type="number" min="0" step="any" value="0.00020221"></div>
+        <div class="control"><label for="alpha">α</label><input id="alpha" type="number" min="0" step="any" value="0.6893"></div>
+        <div class="control"><label for="beta">β (m²)</label><input id="beta" type="number" min="0" step="any" value="21.21"></div>
+        <div class="control"><label for="gamma">γ (m⁻¹)</label><input id="gamma" type="number" min="0" step="any" value="0.1591"></div>
+      </fieldset>
+      <div class="option-actions">
+        <button class="button-primary" id="runDistance">Calculate distance</button>
+        <button id="cancelDistance" hidden>Cancel</button>
+        <button id="exportDistance" disabled>Export distance JSON</button>
+      </div>
+      <p id="distanceStatus" class="feedback mini" role="status"></p>
+      <div id="distanceResults" hidden>
+        <div class="batchmetrics">
+          <div class="panel bigstat"><div class="eyebrow">Optimal d*</div><strong id="optD"></strong><small>metres</small></div>
+          <div class="panel bigstat"><div class="eyebrow">Minimum H(d*)</div><strong id="optH"></strong><small>minutes</small></div>
+          <div class="panel bigstat"><div class="eyebrow">Slope at R</div><strong id="slopeR"></strong><small>minutes / metre</small></div>
+        </div>
+        <section class="panel studies-panel">
+          <div class="paneltitle"><h3>Expected search and approach time (min)</h3><small>Horizontal axis in metres</small></div>
+          <canvas id="distanceChart" class="chart" role="img" aria-label="Model II objective H by separation"></canvas>
+          <p id="distanceDetail" class="mini"></p>
+        </section>
+        <div class="panel studies-panel result-table" id="distanceTable"></div>
+      </div>
+    </section>
+
+    <section id="experimentsView" hidden>
+      <div class="batchintro"><div><div class="eyebrow">Case Study · Section 7</div><h2>Matched Monte Carlo experiments</h2>
+      <p>Measure mean food consumption at 60, 120 and 240 minutes. Compare strategies within the same matched trials.</p></div></div>
+      <div class="experiment-options">
+        <div class="control"><label for="study">Comparison</label><select id="study"></select></div>
+        <div class="control"><label for="K">Trials per configuration</label><input id="K" type="number" min="1" max="1200" step="1" value="1200"></div>
+        <div class="control"><label for="environment">Environment</label><select id="environment"><option value="report">Section 7 defaults</option><option value="applied">Applied simulation settings</option></select></div>
+      </div>
+      <div class="option-actions">
+        <button id="runStudy" class="button-primary">Run comparison</button>
+        <button id="cancelStudy" hidden>Cancel</button>
+        <button id="loadStudy">Load completed Case Study</button>
+        <button id="exportStudy" disabled>Export results CSV</button>
+        <button id="exportStudyJson" disabled>Export results JSON</button>
+      </div>
+      <p id="studyStatus" class="feedback mini" role="status"></p>
+      <section class="panel studies-panel" id="studyResults" hidden>
+        <div class="paneltitle"><h3>Food consumption by configuration</h3><label>Horizon <select id="studyHorizon"><option>60</option><option>120</option><option selected>240</option></select> min</label></div>
+        <p class="mini">Differences are calculated within each trial. Approximate 95% intervals are pointwise. Near is the smallest tested distance for that rule and previous is the next shorter distance.</p>
+        <div id="studyTable" class="result-table"></div>
+      </section>
+    </section>
+
+    <footer class="foot"><span>SCUDEM · Calculations run locally in your browser</span></footer>
+  </main>
+</div>
+
+
+<script src="engine.js"></script>
+<script src="model-ii.js"></script>
+<script src="study.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
